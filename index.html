@@ -1,0 +1,1971 @@
+<!DOCTYPE html>
+<html lang="my" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SarPay AI - Document Translation & Book Studio</title>
+  
+  <!-- Tailwind CSS & Fonts -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Padauk:wght@400;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- PDF.js, Mammoth.js, html2pdf, docx JS Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.2/mammoth.browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://unpkg.com/docx@7.8.2/build/index.js"></script>
+
+  <!-- CryptoJS for Password Hashing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+
+  <!-- Firebase App & Database (v9 Compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              800: '#3730a3',
+              900: '#312e81'
+            }
+          },
+          fontFamily: {
+            burmese: ['Padauk', 'Plus Jakarta Sans', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Padauk', 'Plus Jakarta Sans', sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+    }
+    .glass-card {
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-brand-500 selection:text-white">
+
+  <!-- ================= NOTIFICATION AUDIO SYNTHESIZER ================= -->
+  <script>
+    const AudioEngine = {
+      ctx: null,
+      init() {
+        if (!this.ctx) {
+          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+      },
+      playSuccess() {
+        this.init();
+        if(!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc1 = this.ctx.createOscillator();
+        const osc2 = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc1.type = 'sine';
+        osc2.type = 'triangle';
+
+        osc1.frequency.setValueAtTime(523.25, now);
+        osc1.frequency.exponentialRampToValueAtTime(659.25, now + 0.15);
+        osc1.frequency.exponentialRampToValueAtTime(783.99, now + 0.3);
+        osc1.frequency.exponentialRampToValueAtTime(1046.50, now + 0.45);
+
+        osc2.frequency.setValueAtTime(261.63, now);
+        osc2.frequency.exponentialRampToValueAtTime(523.25, now + 0.45);
+
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + 0.6);
+        osc2.stop(now + 0.6);
+      },
+      playNotice() {
+        this.init();
+        if(!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.2);
+
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.25);
+      }
+    };
+  </script>
+
+  <!-- ================= TOP NAVIGATION BAR ================= -->
+  <header class="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-3 md:px-6 py-3 flex items-center justify-between shadow-lg">
+    <div class="flex items-center space-x-2 md:space-x-3 overflow-hidden">
+      <div class="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-400 flex items-center justify-center text-white font-bold text-lg md:text-xl shadow-md shrink-0">
+        <i class="fa-solid fa-book-open"></i>
+      </div>
+      <div class="truncate">
+        <h1 class="font-bold text-sm md:text-lg text-white leading-tight truncate">SarPay AI Studio</h1>
+        <p class="text-[10px] md:text-xs text-slate-400 truncate">မြန်မာဘာသာပြန်နှင့် စာအုပ်ထုတ်ဝေရေး AI</p>
+      </div>
+    </div>
+
+    <!-- Active User / Admin Nav Profile Bar -->
+    <div id="navUserProfileBar" class="hidden items-center space-x-2 md:space-x-4 shrink-0">
+      
+      <!-- Back to Admin Panel Button -->
+      <button id="navBackToAdminBtn" onclick="returnToAdminPanel()" class="hidden px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow border border-indigo-400 flex items-center space-x-1.5 transition-all">
+        <i class="fa-solid fa-user-shield text-amber-300"></i>
+        <span>Back to Admin Panel</span>
+      </button>
+
+      <div class="hidden sm:flex items-center bg-slate-800/80 rounded-full px-2.5 py-1 border border-slate-700/60 shadow-inner">
+        <span class="text-xs text-amber-400 font-semibold mr-1"><i class="fa-solid fa-coins"></i></span>
+        <span id="navCoinDisplay" class="text-xs md:text-sm font-bold text-amber-300">0</span>
+        <span class="text-[10px] text-slate-400 ml-1">Coins</span>
+      </div>
+
+      <div class="hidden sm:flex items-center bg-slate-800/80 rounded-full px-2.5 py-1 border border-slate-700/60">
+        <span class="text-xs text-emerald-400 font-semibold mr-1"><i class="fa-solid fa-clock"></i></span>
+        <span id="navTimerDisplay" class="text-xs font-mono text-slate-200">00h 00m</span>
+      </div>
+
+      <!-- Manual API Key Trigger Quick Button -->
+      <button onclick="openApiKeyModal()" title="API Key / Token ထည့်ရန်" class="w-8 h-8 md:w-9 md:h-9 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center border border-slate-700 text-amber-400 transition-all">
+        <i class="fa-solid fa-key text-xs md:text-sm"></i>
+      </button>
+
+      <button id="userProfileAvatarBtn" onclick="toggleUserSidebar()" class="w-8 h-8 md:w-9 md:h-9 rounded-full bg-slate-700 hover:bg-slate-600 flex items-center justify-center border border-slate-600 text-brand-300 transition-all focus:ring-2 focus:ring-brand-500">
+        <i class="fa-solid fa-user-circle text-lg md:text-xl"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- ================= MAIN CONTENT CONTAINER ================= -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-4 md:p-6 relative">
+
+    <!-- Admin Return Banner Mode Display in Preview -->
+    <div id="adminModeBanner" class="hidden mb-4 p-3 bg-indigo-900/60 border border-indigo-500 rounded-2xl flex items-center justify-between text-xs text-indigo-200 shadow-lg">
+      <div class="flex items-center space-x-2">
+        <i class="fa-solid fa-eye text-amber-400 text-base"></i>
+        <span><strong>Admin Preview Mode:</strong> သင်သည် Admin Mode မှ Preview သို့ ကြည့်ရှုနေခြင်း ဖြစ်ပါသည်။</span>
+      </div>
+      <button onclick="returnToAdminPanel()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl border border-indigo-400 shrink-0">
+        <i class="fa-solid fa-arrow-left mr-1"></i> Admin Panel သို့ပြန်သွားရန်
+      </button>
+    </div>
+
+    <!-- ================= 1. AUTH / REGISTRATION VIEW ================= -->
+    <section id="authSection" class="max-w-md mx-auto my-4 md:my-8 p-4 sm:p-6 md:p-8 rounded-2xl glass-card shadow-2xl relative overflow-hidden">
+      <div class="absolute -top-10 -right-10 w-32 h-32 bg-brand-500/20 rounded-full blur-2xl"></div>
+      
+      <div class="text-center mb-6">
+        <h2 id="authTitle" class="text-xl md:text-2xl font-bold text-white">အကောင့်ဝင်ပါ / အကောင့်သစ်ဖွင့်ပါ</h2>
+        <p class="text-xs text-slate-400 mt-1">SarPay AI Translator မှ ကြိုဆိုပါသည်</p>
+      </div>
+
+      <!-- Auth Tabs -->
+      <div class="flex bg-slate-800/80 p-1 rounded-xl mb-6 text-xs md:text-sm">
+        <button id="tabLoginBtn" type="button" onclick="switchAuthTab('login')" class="flex-1 py-2 rounded-lg font-semibold text-white bg-brand-600 shadow transition-all">Login</button>
+        <button id="tabRegisterBtn" type="button" onclick="switchAuthTab('register')" class="flex-1 py-2 rounded-lg font-semibold text-slate-400 hover:text-white transition-all">Register</button>
+        <button id="tabAdminBtn" type="button" onclick="switchAuthTab('admin')" class="flex-1 py-2 rounded-lg font-semibold text-slate-400 hover:text-white transition-all"><i class="fa-solid fa-lock text-xs mr-1"></i>Admin</button>
+      </div>
+
+      <!-- Form Inputs -->
+      <form id="authForm" onsubmit="handleAuthSubmit(event)" class="space-y-4" data-mode="login">
+        <div id="usernameGroup" class="hidden">
+          <label class="block text-xs text-slate-300 mb-1">အမည် (Full Name)</label>
+          <input type="text" id="authName" class="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="မောင်မောင်">
+        </div>
+
+        <div id="phoneGroup">
+          <label class="block text-xs text-slate-300 mb-1">ဖုန်းနံပါတ် သို့မဟုတ် Username</label>
+          <input type="text" id="authPhone" class="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="09123456789">
+        </div>
+
+        <div>
+          <label id="passwordLabel" class="block text-xs text-slate-300 mb-1">စကားဝှက် (Password)</label>
+          <input type="password" id="authPassword" required class="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="••••••••">
+        </div>
+
+        <button type="submit" id="authSubmitBtn" class="w-full py-3 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg transition-all transform active:scale-95 text-sm">
+          ဝင်ရောက်မည်
+        </button>
+      </form>
+
+      <div id="authAlert" class="mt-4 hidden p-3 rounded-xl text-xs text-center border"></div>
+    </section>
+
+
+    <!-- ================= 2. TRANSLATION / STUDIO PREVIEW PAGE ================= -->
+    <section id="previewSection" class="hidden space-y-4 md:space-y-6">
+      
+      <!-- Manual API Status Alert -->
+      <div id="manualKeyActiveBanner" class="hidden p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 flex items-center justify-between text-xs">
+        <div class="flex items-center space-x-2">
+          <i class="fa-solid fa-key text-amber-400"></i>
+          <span>Custom API / Token စနစ် ချိတ်ဆက်ထားပါသည် (<span id="activeKeyProviderText" class="font-bold uppercase text-white">HuggingFace / ModelScope</span>)</span>
+        </div>
+        <button onclick="openApiKeyModal()" class="text-[11px] text-amber-400 underline font-semibold">ပြင်ဆင်မည်</button>
+      </div>
+
+      <!-- Time Lock Alert Banner -->
+      <div id="timeLockBanner" class="hidden p-3 md:p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div class="flex items-center space-x-3">
+          <i class="fa-solid fa-triangle-exclamation text-xl text-amber-400 shrink-0"></i>
+          <div>
+            <h4 class="font-bold text-xs md:text-sm">အသုံးပြုချိန် သက်တမ်း ကုန်ဆုံးသွားပါပြီ (Apk Locked)</h4>
+            <p class="text-[11px] md:text-xs text-slate-300">ဘာသာပြန်စနစ်အား ဆက်လက်အသုံးပြုရန် Admin ထံမှ Coin ဖြင့် Time လဲလှယ်ဝယ်ယူပါ</p>
+          </div>
+        </div>
+        <button onclick="toggleUserSidebar(); openCoinBuyModal();" class="w-full sm:w-auto px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-xl shadow shrink-0">Coin ဝယ်မည်</button>
+      </div>
+
+      <!-- TRANSLATION MODE SWITCH TABS (File vs Direct Text) -->
+      <div class="flex bg-slate-900/90 p-1.5 rounded-xl border border-slate-800 text-xs md:text-sm">
+        <button id="modeFileBtn" type="button" onclick="switchTranslationMode('file')" class="flex-1 py-2.5 rounded-lg font-semibold text-white bg-brand-600 shadow transition-all flex items-center justify-center space-x-2">
+          <i class="fa-solid fa-file-arrow-up"></i>
+          <span>ဖိုင်တင်၍ ဘာသာပြန်ရန်</span>
+        </button>
+        <button id="modeTextBtn" type="button" onclick="switchTranslationMode('text')" class="flex-1 py-2.5 rounded-lg font-semibold text-slate-400 hover:text-white transition-all flex items-center justify-center space-x-2">
+          <i class="fa-solid fa-keyboard"></i>
+          <span>စာသား (Text) ကူးထည့်၍ ဘာသာပြန်ရန်</span>
+        </button>
+      </div>
+
+      <!-- ================= 2.1 FILE UPLOAD BOX ================= -->
+      <div id="fileUploadContainer" class="glass-card p-4 sm:p-6 md:p-8 rounded-2xl text-center border-dashed border-2 border-slate-700 hover:border-brand-500 transition-all relative">
+        <input type="file" id="documentFileInput" accept=".pdf,.docx,.txt" onchange="handleFileSelected(event)" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+        
+        <div class="space-y-3 pointer-events-none">
+          <div class="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-brand-500/10 text-brand-400 flex items-center justify-center mx-auto text-2xl md:text-3xl">
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+          </div>
+          <h3 class="text-sm md:text-base font-bold text-white">PDF, Word (.docx) သို့မဟုတ် TXT ဖိုင် တင်ပါ</h3>
+          <p class="text-[11px] md:text-xs text-slate-400">စာမျက်နှာ ၅ မျက်နှာထက် ပိုပါက ၅ မျက်နှာစီ အပိုင်းခွဲ၍ မိမိဘာသာပြန်ဆိုလိုသော အပိုင်းကို စိတ်ကြိုက် ရွေးချယ်နိုင်ပါသည်</p>
+          <div id="fileInfoDisplay" class="hidden inline-flex items-center space-x-2 bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700 text-xs text-emerald-400 font-semibold max-w-full truncate">
+            <i class="fa-solid fa-file-lines shrink-0"></i>
+            <span id="fileNameText" class="truncate">filename.pdf</span>
+            <span id="filePageText" class="text-slate-400 text-[10px] ml-1 shrink-0">(0 pages)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= PAGE CHUNK SELECTION CONTAINER (If > 5 Pages) ================= -->
+      <div id="pageChunkSelectionWrapper" class="hidden glass-card p-4 rounded-2xl border-indigo-500/40 space-y-3">
+        <div class="flex items-center justify-between">
+          <label class="block text-xs font-bold text-amber-300 flex items-center space-x-2">
+            <i class="fa-solid fa-list-check text-amber-400"></i>
+            <span>ဘာသာပြန်ဆိုမည့် Page အပိုင်း ( Chunk ) ကို ရွေးချယ်ပါ (၅ မျက်နှာစီ ခွဲထားပါသည်)</span>
+          </label>
+          <span id="totalChunkInfoText" class="text-[11px] text-slate-400"></span>
+        </div>
+        
+        <div id="chunkOptionsContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 text-xs">
+          <!-- Chunk radio options injected dynamically -->
+        </div>
+      </div>
+
+      <!-- ================= 2.2 DIRECT TEXT INPUT BOX ================= -->
+      <div id="textInputContainer" class="hidden glass-card p-4 sm:p-6 rounded-2xl space-y-3">
+        <label class="block text-xs font-bold text-slate-300 flex items-center space-x-2">
+          <i class="fa-solid fa-pen-to-square text-brand-400"></i>
+          <span>ဘာသာပြန်လိုသော စာသားကို ဤနေရာတွင် Copy ကူးထည့်ပါ (Paste)</span>
+        </label>
+        <textarea id="directTextInputArea" rows="6" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs md:text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-500 font-burmese" placeholder="Enter or paste text here to translate..."></textarea>
+      </div>
+
+      <!-- ================= TRANSLATION STYLE SELECTION (3 STYLES) ================= -->
+      <div class="glass-card p-4 rounded-2xl space-y-3">
+        <label class="block text-xs font-bold text-slate-200 flex items-center space-x-2">
+          <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i>
+          <span>ဘာသာပြန်ဆိုမည့် စတိုင် (Translation Style) ရွေးချယ်ပါ</span>
+        </label>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <label class="flex items-center space-x-2.5 p-3 rounded-xl bg-slate-900/80 border border-slate-700 hover:border-brand-500 cursor-pointer transition-all">
+            <input type="radio" name="translationStyle" value="offcial" class="text-brand-600 focus:ring-brand-500" checked>
+            <div>
+              <span class="font-bold text-white block">ရုံးသုံး (Official)</span>
+              <span class="text-[10px] text-slate-400">စာရွက်စာတမ်းနှင့် ရုံးသုံးပုံစံ</span>
+            </div>
+          </label>
+          <label class="flex items-center space-x-2.5 p-3 rounded-xl bg-slate-900/80 border border-slate-700 hover:border-brand-500 cursor-pointer transition-all">
+            <input type="radio" name="translationStyle" value="prose" class="text-brand-600 focus:ring-brand-500">
+            <div>
+              <span class="font-bold text-white block">စကားပြေ (Prose)</span>
+              <span class="text-[10px] text-slate-400">ဖတ်ရှုရလွယ်ကူသော သာမန်စကားပြေ</span>
+            </div>
+          </label>
+          <label class="flex items-center space-x-2.5 p-3 rounded-xl bg-slate-900/80 border border-slate-700 hover:border-brand-500 cursor-pointer transition-all">
+            <input type="radio" name="translationStyle" value="literary" class="text-brand-600 focus:ring-brand-500">
+            <div>
+              <span class="font-bold text-white block">စာပေ (Literary)</span>
+              <span class="text-[10px] text-slate-400">စာပေဆန်ဆန် အနုပညာမြောက်</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Action Button & Settings -->
+      <div class="flex flex-col md:flex-row items-center justify-between gap-3 md:gap-4">
+        <div class="text-[11px] md:text-xs text-slate-400 text-center md:text-left">
+          * Translation Engines: <span class="text-emerald-300 font-semibold">Hugging Face Free API & ModelScope (Alibaba AI)</span>
+        </div>
+        <div class="flex items-center space-x-2 w-full md:w-auto">
+          <button type="button" onclick="openApiKeyModal()" class="px-3 py-3 bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold text-xs rounded-xl border border-slate-700 flex items-center justify-center space-x-1 shrink-0">
+            <i class="fa-solid fa-key"></i>
+            <span>API / Token ထည့်မည်</span>
+          </button>
+          <button type="button" id="startTranslateBtn" onclick="executeTranslationWorkflow()" class="flex-1 md:flex-initial px-6 md:px-8 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs md:text-sm rounded-xl shadow-lg flex items-center justify-center space-x-2 transition-all">
+            <i class="fa-solid fa-language"></i>
+            <span>Myanmar စာ Translation ဘာသာပြန်မည်</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Progress & Estimation Dashboard -->
+      <div id="translationProgressCard" class="hidden glass-card p-4 md:p-5 rounded-2xl space-y-3 border-brand-500/30">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between text-xs gap-1">
+          <span class="text-slate-300 font-medium flex items-center space-x-2">
+            <i class="fa-solid fa-spinner fa-spin text-brand-400"></i>
+            <span id="progressStatusText">ဘာသာပြန်ဆိုနေသည်...</span>
+          </span>
+          <span class="text-slate-400 text-[11px]">
+            ခန့်မှန်းကြာမြင့်ချိန်: <span id="estimatedTimeText" class="text-amber-300 font-mono">00:00</span> | 
+            ကုန်လွန်ချိန်: <span id="elapsedTimeText" class="text-emerald-300 font-mono">00:00</span>
+          </span>
+        </div>
+        <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
+          <div id="progressBarFill" class="bg-gradient-to-r from-brand-500 to-emerald-400 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- Result Container -->
+      <div id="translationResultWrapper" class="hidden space-y-4 md:space-y-6">
+        
+        <!-- Controls Bar -->
+        <div class="flex flex-col sm:flex-row flex-wrap items-center justify-between gap-3 bg-slate-900/90 p-3 md:p-4 rounded-xl border border-slate-800">
+          <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <button type="button" onclick="copyFullTranslation()" class="flex-1 sm:flex-none px-3 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 rounded-lg border border-slate-700 flex items-center justify-center space-x-1.5">
+              <i class="fa-solid fa-copy"></i>
+              <span>Copy</span>
+            </button>
+            <button type="button" onclick="downloadAsFormat('txt')" class="flex-1 sm:flex-none px-3 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 rounded-lg border border-slate-700 flex items-center justify-center space-x-1.5">
+              <i class="fa-solid fa-download"></i>
+              <span>TXT</span>
+            </button>
+            <button type="button" onclick="downloadAsFormat('pdf')" class="flex-1 sm:flex-none px-3 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 rounded-lg border border-slate-700 flex items-center justify-center space-x-1.5">
+              <i class="fa-solid fa-file-pdf text-red-400"></i>
+              <span>PDF</span>
+            </button>
+            <button type="button" onclick="downloadAsFormat('docx')" class="flex-1 sm:flex-none px-3 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 rounded-lg border border-slate-700 flex items-center justify-center space-x-1.5">
+              <i class="fa-solid fa-file-word text-blue-400"></i>
+              <span>Word</span>
+            </button>
+          </div>
+
+          <!-- AI Executive Review Button -->
+          <button type="button" onclick="downloadAIReviewFile()" class="w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-xs font-bold text-white rounded-lg shadow flex items-center justify-center space-x-2">
+            <i class="fa-solid fa-brain"></i>
+            <span>AI Review & Summary File</span>
+          </button>
+        </div>
+
+        <!-- Segment Cards Container -->
+        <div id="segmentCardsContainer" class="space-y-4"></div>
+
+        <!-- Standard Single Translation View -->
+        <div id="singleTranslationCard" class="glass-card p-4 md:p-6 rounded-2xl">
+          <h4 class="text-xs md:text-sm font-bold text-brand-300 mb-3 flex items-center justify-between">
+            <span>မြန်မာဘာသာပြန် ရလဒ်</span>
+          </h4>
+          <div id="translatedOutputContent" class="text-xs md:text-sm text-slate-200 leading-relaxed whitespace-pre-wrap font-burmese"></div>
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- ================= 3. ADMIN PANEL VIEW ================= -->
+    <section id="adminSection" class="hidden space-y-4 md:space-y-6">
+      
+      <!-- Admin Header Banner -->
+      <div class="glass-card p-4 md:p-6 rounded-2xl border-indigo-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center space-x-2">
+            <span class="px-2.5 py-1 bg-indigo-500/20 text-indigo-300 text-[10px] md:text-xs font-bold rounded-md border border-indigo-500/30">ADMIN CONTROL</span>
+            <h2 class="text-lg md:text-xl font-bold text-white">SarPay Admin Dashboard</h2>
+          </div>
+          <p class="text-[11px] md:text-xs text-slate-400 mt-1">User စာရင်းများ၊ Coin ဝယ်ယူမှုတောင်းဆိုချက်များ နှင့် ငွေလက်ခံမည့် Account များကို စီမံခန့်ခွဲပါ</p>
+        </div>
+        
+        <div class="flex items-center justify-between w-full md:w-auto gap-3">
+          <div class="bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700 text-center">
+            <span class="text-[9px] text-slate-400 uppercase tracking-wider block">Total Users</span>
+            <span id="adminTotalUsersText" class="text-base md:text-lg font-bold text-emerald-400">0</span>
+          </div>
+
+          <!-- Dashboard Button -> Directs to Previews Section -->
+          <button type="button" onclick="adminGoToPreviewDashboard()" class="px-3.5 py-2 bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center space-x-1.5">
+            <i class="fa-solid fa-chart-line"></i>
+            <span>Dashboard (Preview)</span>
+          </button>
+
+          <button type="button" onclick="adminLogout()" class="px-3.5 py-2 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center space-x-1.5">
+            <i class="fa-solid fa-right-from-bracket"></i>
+            <span>Log Out</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Payment Settings Form -->
+      <div class="glass-card p-4 md:p-6 rounded-2xl space-y-4">
+        <h3 class="text-xs md:text-sm font-bold text-white flex items-center space-x-2">
+          <i class="fa-solid fa-wallet text-amber-400"></i>
+          <span>ငွေလက်ခံမည့် ဖုန်းနံပါတ် / Address များ သတ်မှတ်ရန်</span>
+        </h3>
+        <p class="text-[11px] md:text-xs text-slate-400">Admin မှ ဤနေရာတွင် မဖြည့်သွင်းမချင်း User များအား မည်သည့် ဖုန်းနံပါတ်/Address မှ ဖော်ပြမည်မဟုတ်ပါ</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 text-xs">
+          <div>
+            <label class="block text-[11px] text-slate-300 mb-1">KPay Phone Number</label>
+            <input type="text" id="adminKpayInput" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white" placeholder="09xxxxxxxxx (Name)">
+          </div>
+          <div>
+            <label class="block text-[11px] text-slate-300 mb-1">WaveMoney Phone Number</label>
+            <input type="text" id="adminWaveInput" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white" placeholder="09xxxxxxxxx (Name)">
+          </div>
+          <div>
+            <label class="block text-[11px] text-slate-300 mb-1">Crypto USDT (BEP-20) Address</label>
+            <input type="text" id="adminCryptoInput" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white" placeholder="0x...">
+          </div>
+        </div>
+
+        <button type="button" onclick="saveAdminPaymentConfig()" class="w-full sm:w-auto px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold rounded-xl shadow">
+          Payment Data များ Firebase သို့ Save မည်
+        </button>
+      </div>
+
+      <!-- Top Up Requests Section -->
+      <div class="glass-card p-4 md:p-6 rounded-2xl space-y-4">
+        <h3 class="text-xs md:text-sm font-bold text-white flex items-center space-x-2">
+          <i class="fa-solid fa-receipt text-emerald-400"></i>
+          <span>Coin ဝယ်ယူခွင့် တောင်းဆိုထားသည့် စာရင်းများ</span>
+        </h3>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-300 min-w-[500px]">
+            <thead class="bg-slate-800 text-slate-400 uppercase text-[10px]">
+              <tr>
+                <th class="p-3">User ID / Phone</th>
+                <th class="p-3">Method</th>
+                <th class="p-3">Trx ID / Slip</th>
+                <th class="p-3">Requested Coins</th>
+                <th class="p-3">Action</th>
+              </tr>
+            </thead>
+            <tbody id="adminTopupTableBody" class="divide-y divide-slate-800">
+              <tr>
+                <td colspan="5" class="p-4 text-center text-slate-500">တောင်းဆိုထားသော စာရင်းများ မရှိသေးပါ</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+
+  <!-- ================= USER PROFILE SIDEBAR DRAWER ================= -->
+  <div id="userSidebarOverlay" onclick="toggleUserSidebar()" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden transition-opacity"></div>
+  <div id="userSidebar" class="fixed top-0 right-0 bottom-0 w-72 sm:w-80 md:w-96 bg-slate-900 border-l border-slate-800 z-50 transform translate-x-full transition-transform duration-300 flex flex-col justify-between p-4 md:p-5 overflow-y-auto">
+    
+    <div class="space-y-5 md:space-y-6">
+      <!-- Header -->
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+        <div class="flex items-center space-x-3 truncate">
+          <div class="w-9 h-9 rounded-full bg-brand-600 flex items-center justify-center text-white font-bold shrink-0">
+            <i class="fa-solid fa-user"></i>
+          </div>
+          <div class="truncate">
+            <h3 id="sidebarUserName" class="text-xs md:text-sm font-bold text-white truncate">User Name</h3>
+            <p id="sidebarUserPhone" class="text-[11px] text-slate-400 truncate">09xxxxxxxxx</p>
+          </div>
+        </div>
+        <button type="button" onclick="toggleUserSidebar()" class="text-slate-400 hover:text-white shrink-0"><i class="fa-solid fa-times text-lg"></i></button>
+      </div>
+
+      <!-- Balance & Time Stats -->
+      <div class="grid grid-cols-2 gap-2.5">
+        <div class="bg-slate-800/80 p-3 rounded-xl border border-slate-700/50">
+          <span class="text-[10px] text-slate-400 block mb-1">Coin Balance</span>
+          <span id="sidebarCoinCount" class="text-base md:text-lg font-bold text-amber-400">0</span>
+        </div>
+        <div class="bg-slate-800/80 p-3 rounded-xl border border-slate-700/50">
+          <span class="text-[10px] text-slate-400 block mb-1">Remaining Time</span>
+          <span id="sidebarTimerCount" class="text-xs font-mono text-emerald-400">00h 00m</span>
+        </div>
+      </div>
+
+      <!-- Actions & Functions -->
+      <div class="space-y-2">
+        <button type="button" onclick="openApiKeyModal()" class="w-full py-2.5 px-3.5 bg-slate-800 hover:bg-slate-700 text-amber-300 font-semibold text-xs rounded-xl border border-slate-700 flex items-center justify-between">
+          <span><i class="fa-solid fa-key mr-2 text-amber-400"></i>Manual Key / HF Token / ModelScope ထည့်သွင်းရန်</span>
+          <i class="fa-solid fa-chevron-right"></i>
+        </button>
+
+        <button type="button" onclick="openCoinBuyModal()" class="w-full py-2.5 px-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs rounded-xl shadow flex items-center justify-between">
+          <span><i class="fa-solid fa-cart-shopping mr-2"></i>Coin ဝယ်ယူမည်</span>
+          <i class="fa-solid fa-chevron-right"></i>
+        </button>
+
+        <button type="button" onclick="openCoinExchangeModal()" class="w-full py-2.5 px-3.5 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs rounded-xl border border-slate-700 flex items-center justify-between">
+          <span><i class="fa-solid fa-clock-rotate-left mr-2 text-emerald-400"></i>Coin ဖြင့် Time လဲလှယ်မည်</span>
+          <i class="fa-solid fa-chevron-right"></i>
+        </button>
+
+        <button type="button" onclick="openCoinTransferModal()" class="w-full py-2.5 px-3.5 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs rounded-xl border border-slate-700 flex items-center justify-between">
+          <span><i class="fa-solid fa-paper-plane mr-2 text-blue-400"></i>Coin Transfer လွှဲမည်</span>
+          <i class="fa-solid fa-chevron-right"></i>
+        </button>
+      </div>
+
+      <!-- Translation History Tabs -->
+      <div class="pt-4 border-t border-slate-800 space-y-3">
+        <h4 class="text-[11px] font-bold text-slate-300 uppercase tracking-wider">ဘာသာပြန် မှတ်တမ်းများ</h4>
+        
+        <div class="space-y-2">
+          <button type="button" onclick="showHistoryModal('small')" class="w-full py-2 px-3 bg-slate-800/50 hover:bg-slate-800 text-left text-xs text-slate-200 rounded-lg flex items-center justify-between">
+            <span class="truncate"><i class="fa-solid fa-file-lines mr-2 text-teal-400"></i>စာအုပ်အသေးများ မှတ်တမ်း</span>
+            <i class="fa-solid fa-angle-right text-slate-500 shrink-0 ml-1"></i>
+          </button>
+
+          <button type="button" onclick="showHistoryModal('large')" class="w-full py-2 px-3 bg-slate-800/50 hover:bg-slate-800 text-left text-xs text-slate-200 rounded-lg flex items-center justify-between">
+            <span class="truncate"><i class="fa-solid fa-book mr-2 text-indigo-400"></i>စာအုပ်အကြီးများ မှတ်တမ်း</span>
+            <i class="fa-solid fa-angle-right text-slate-500 shrink-0 ml-1"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- User Logout -->
+    <div class="pt-4 border-t border-slate-800">
+      <button type="button" onclick="handleUserLogout()" class="w-full py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold text-xs rounded-xl border border-red-500/20 flex items-center justify-center space-x-2">
+        <i class="fa-solid fa-right-from-bracket"></i>
+        <span>အကောင့်မှ ထွက်မည် (Logout)</span>
+      </button>
+    </div>
+
+  </div>
+
+
+  <!-- ================= MODALS CONTAINER ================= -->
+
+  <!-- 0. MANUAL API KEY / HUGGINGFACE TOKEN / MODELSCOPE MODAL -->
+  <div id="apiKeyModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+    <div class="glass-card max-w-md w-full p-5 md:p-6 rounded-2xl space-y-4 relative">
+      <button type="button" onclick="closeModal('apiKeyModal')" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-times"></i></button>
+      <h3 class="text-sm md:text-base font-bold text-white flex items-center space-x-2">
+        <i class="fa-solid fa-key text-amber-400"></i>
+        <span>Custom Key / Token ရိုက်ထည့်ရန်</span>
+      </h3>
+      <p class="text-[11px] md:text-xs text-slate-400">
+        အခမဲ့ Hugging Face Inference API Token (hf_xxx) သို့မဟုတ် Alibaba ModelScope Access Token ကို ဦးစားပေး စမ်းသပ်ထည့်သွင်းနိုင်ပါသည်။
+      </p>
+
+      <form onsubmit="handleManualApiKeySave(event)" class="space-y-3 text-xs">
+        <div>
+          <label class="block text-slate-300 mb-1 text-[11px]">API Provider / Service ရွေးချယ်ပါ</label>
+          <select id="manualProviderSelect" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:ring-2 focus:ring-brand-500">
+            <option value="huggingface">Hugging Face Free API Token (hf_...)</option>
+            <option value="modelscope">ModelScope (Alibaba Cloud AI Token)</option>
+            <option value="free_gateway">Free Public Translate Gateway (No Token Needed)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-slate-300 mb-1 text-[11px]">Key / Token ရိုက်ထည့်ပါ (မဖြစ်မနေ မဟုတ်ပါ)</label>
+          <input type="password" id="manualApiKeyInput" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs font-mono" placeholder="hf_... သို့မဟုတ် ModelScope Token">
+        </div>
+
+        <div class="flex items-center space-x-2 pt-1">
+          <input type="checkbox" id="useManualKeyOnlyCheck" class="rounded border-slate-700 text-brand-600 focus:ring-brand-500 bg-slate-900">
+          <label for="useManualKeyOnlyCheck" class="text-[11px] text-slate-300">မိမိထည့်ထားသော Provider အား ပထမဦးစားပေး သုံးမည်</label>
+        </div>
+
+        <!-- Validation Status Text -->
+        <div id="apiKeyTestStatusText" class="hidden text-[11px] p-2 rounded-lg text-center font-semibold"></div>
+
+        <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 pt-2">
+          <button type="button" onclick="testManualApiKeyConnection()" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow text-xs transition-all flex items-center justify-center space-x-1.5">
+            <i class="fa-solid fa-plug-circle-check"></i>
+            <span>Test Connection</span>
+          </button>
+          <button type="submit" class="flex-1 py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-bold rounded-xl shadow text-xs transition-all">
+            သိမ်းဆည်းမည်
+          </button>
+        </div>
+        
+        <div class="text-center pt-1">
+          <button type="button" onclick="clearManualApiKey()" class="text-[11px] text-red-400 hover:underline">သိမ်းဆည်းထားသော Key ဖျက်ရန်</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 1. COIN BUY MODAL (UPDATED WITH LOGOS & CUSTOM AMOUNT) -->
+  <div id="coinBuyModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+    <div class="glass-card max-w-md w-full p-5 md:p-6 rounded-2xl space-y-4 relative max-h-[90vh] overflow-y-auto">
+      <button type="button" onclick="closeModal('coinBuyModal')" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-times"></i></button>
+      <h3 class="text-sm md:text-base font-bold text-white flex items-center space-x-2">
+        <i class="fa-solid fa-coins text-amber-400"></i>
+        <span>Coin ဝယ်ယူရန် ငွေချေစနစ်</span>
+      </h3>
+
+      <!-- Admin Payment Display Info -->
+      <div id="paymentMethodsDisplay" class="space-y-2 bg-slate-900/80 p-3.5 rounded-xl border border-slate-800 text-xs">
+        <p class="text-slate-400 text-[11px]">Admin မှ သတ်မှတ်ထားသော ငွေလက်ခံမည့် Account များ:</p>
+        <div id="kpayDisplay" class="text-slate-200 truncate">KPay: <span class="text-amber-300 font-mono">မသတ်မှတ်ရသေးပါ</span></div>
+        <div id="waveDisplay" class="text-slate-200 truncate">WavePay: <span class="text-amber-300 font-mono">မသတ်မှတ်ရသေးပါ</span></div>
+        <div id="cryptoDisplay" class="text-slate-200 truncate">USDT (BEP-20): <span class="text-amber-300 font-mono">မသတ်မှတ်ရသေးပါ</span></div>
+      </div>
+
+      <form onsubmit="handleTopupSubmit(event)" class="space-y-4 text-xs">
+        
+        <!-- Payment Choice Selection (With Logos) -->
+        <div>
+          <label class="block text-slate-300 mb-2 text-[11px] font-bold">ငွေလွှဲခဲ့သည့် စနစ် ရွေးချယ်ပါ</label>
+          <input type="hidden" id="topupMethodSelect" value="KPay">
+          
+          <div class="grid grid-cols-3 gap-2">
+            <!-- KBZ Pay Card -->
+            <button type="button" onclick="selectPaymentMethod('KPay')" id="payBtnKPay" class="pay-method-btn flex flex-col items-center justify-center p-2.5 rounded-xl border border-brand-500 bg-brand-900/20 text-white hover:border-brand-500 transition-all">
+              <div class="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold mb-1 shadow text-sm">
+                KBZ
+              </div>
+              <span class="text-[11px] font-bold">KBZ Pay</span>
+            </button>
+
+            <!-- WaveMoney Card -->
+            <button type="button" onclick="selectPaymentMethod('WavePay')" id="payBtnWavePay" class="pay-method-btn flex flex-col items-center justify-center p-2.5 rounded-xl border border-slate-700 bg-slate-900/90 text-slate-300 hover:border-brand-500 transition-all">
+              <div class="w-9 h-9 rounded-full bg-yellow-500 flex items-center justify-center text-slate-950 font-extrabold mb-1 shadow text-sm">
+                W
+              </div>
+              <span class="text-[11px] font-bold">WavePay</span>
+            </button>
+
+            <!-- USDT BEP-20 Card -->
+            <button type="button" onclick="selectPaymentMethod('USDT BEP-20')" id="payBtnUSDT" class="pay-method-btn flex flex-col items-center justify-center p-2.5 rounded-xl border border-slate-700 bg-slate-900/90 text-slate-300 hover:border-brand-500 transition-all">
+              <div class="w-9 h-9 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold mb-1 shadow text-sm">
+                ₮
+              </div>
+              <span class="text-[11px] font-bold">USDT (BEP20)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Coin Amount Quick Preset & Custom Input -->
+        <div>
+          <label class="block text-slate-300 mb-1.5 text-[11px] font-bold">ဝယ်ယူလိုသော Coin ပမာဏ ရွေးချယ်ပါ</label>
+          
+          <!-- Preset Chips (10, 20, 30, ... 100) -->
+          <div class="grid grid-cols-5 gap-1.5 mb-2.5">
+            <button type="button" onclick="setCoinAmountPreset(10)" class="py-1.5 bg-slate-800 hover:bg-brand-600 text-white rounded-lg border border-slate-700 font-bold text-xs transition-all">10</button>
+            <button type="button" onclick="setCoinAmountPreset(20)" class="py-1.5 bg-slate-800 hover:bg-brand-600 text-white rounded-lg border border-slate-700 font-bold text-xs transition-all">20</button>
+            <button type="button" onclick="setCoinAmountPreset(30)" class="py-1.5 bg-slate-800 hover:bg-brand-600 text-white rounded-lg border border-slate-700 font-bold text-xs transition-all">30</button>
+            <button type="button" onclick="setCoinAmountPreset(40)" class="py-1.5 bg-slate-800 hover:bg-brand-600 text-white rounded-lg border border-slate-700 font-bold text-xs transition-all">40</button>
+            <button type="button" onclick="setCoinAmountPreset(50)" class="py-1.5 bg-slate-800 hover:bg-brand-600 text-white rounded-lg border border-slate-700 font-bold text-xs transition-all">50</button>
+            <button type="button" onclick="setCoinAmountPreset(60)" class="py-1.5 bg-slate-800 hover:bg-brand-600 text-white rounded-lg border border-slate-700 font-bold text-xs transition-all">60</button>
+            <button type="button" onclick="setCoinAmountPreset(70)" class="py-1.5 bg-slate-800 hover:bg-brand-600 text-white rounded-lg border border-slate-700 font-bold text-xs transition-all">70</button>
+            <button type="button" onclick="setCoinAmountPreset(80)" class="py-1.5 bg-slate-800 hover:bg-brand-600 text-white rounded-lg border border-slate-700 font-bold text-xs transition-all">80</button>
+            <button type="button" onclick="setCoinAmountPreset(90)" class="py-1.5 bg-slate-800 hover:bg-brand-600 text-white rounded-lg border border-slate-700 font-bold text-xs transition-all">90</button>
+            <button type="button" onclick="setCoinAmountPreset(100)" class="py-1.5 bg-slate-800 hover:bg-brand-600 text-white rounded-lg border border-slate-700 font-bold text-xs transition-all">100</button>
+          </div>
+
+          <!-- Custom Custom Amount Input -->
+          <div>
+            <label class="block text-slate-400 mb-1 text-[10px]">သို့မဟုတ် စိတ်ကြိုက် ပမာဏ ရိုက်ထည့်ပါ (Custom Amount):</label>
+            <input type="number" id="topupCoinAmount" min="1" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold text-amber-300 focus:ring-2 focus:ring-amber-400" placeholder="ဥပမာ - 150">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-slate-300 mb-1 text-[11px] font-bold">ငွေလွှဲ Transaction ID (သို့မဟုတ် အနောက် ၄ လုံး)</label>
+          <input type="text" id="topupTrxInput" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs" placeholder="123456">
+        </div>
+
+        <button type="submit" class="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold rounded-xl shadow-lg text-xs transform active:scale-95 transition-all">
+          Admin သို့ တောင်းဆိုချက် ပို့မည်
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2. COIN TO TIME EXCHANGE MODAL -->
+  <div id="coinExchangeModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+    <div class="glass-card max-w-sm w-full p-5 md:p-6 rounded-2xl space-y-4 relative">
+      <button type="button" onclick="closeModal('coinExchangeModal')" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-times"></i></button>
+      <h3 class="text-sm md:text-base font-bold text-white flex items-center space-x-2">
+        <i class="fa-solid fa-clock text-emerald-400"></i>
+        <span>Coin ဖြင့် Time လဲလှယ်မည်</span>
+      </h3>
+      <p class="text-[11px] md:text-xs text-slate-400">၁၀ Coins = ၁ နာရီ အသုံးပြုချိန် ရရှိပါမည်</p>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-slate-300 mb-1 text-[11px]">လဲလှယ်လိုသော Coin ပမာဏ</label>
+          <input type="number" id="exchangeCoinInput" min="10" step="10" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs" placeholder="10">
+        </div>
+        <button type="button" onclick="executeCoinToTimeExchange()" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow text-xs">
+          Time လဲလှယ်မည်
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. COIN TRANSFER MODAL -->
+  <div id="coinTransferModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+    <div class="glass-card max-w-sm w-full p-5 md:p-6 rounded-2xl space-y-4 relative">
+      <button type="button" onclick="closeModal('coinTransferModal')" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-times"></i></button>
+      <h3 class="text-sm md:text-base font-bold text-white flex items-center space-x-2">
+        <i class="fa-solid fa-paper-plane text-blue-400"></i>
+        <span>User အချင်းချင်း Coin Transfer</span>
+      </h3>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-slate-300 mb-1 text-[11px]">လက်ခံမည့် User ဖုန်းနံပါတ် / ID</label>
+          <input type="text" id="transferTargetPhone" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs" placeholder="09xxxxxxxxx">
+        </div>
+        <div>
+          <label class="block text-slate-300 mb-1 text-[11px]">လွှဲပြောင်းမည့် Coin ပမာဏ</label>
+          <input type="number" id="transferAmountInput" min="1" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs" placeholder="5">
+        </div>
+        <button type="button" onclick="executeCoinTransfer()" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow text-xs">
+          Coin လွှဲပြောင်းမည်
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. TRANSLATION HISTORY MODAL -->
+  <div id="historyModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3">
+    <div class="glass-card max-w-2xl w-full p-4 md:p-6 rounded-2xl space-y-4 relative max-h-[85vh] flex flex-col">
+      <button type="button" onclick="closeModal('historyModal')" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-times"></i></button>
+      <h3 id="historyModalTitle" class="text-sm md:text-base font-bold text-white flex items-center space-x-2 truncate pr-6">
+        <i class="fa-solid fa-history text-indigo-400"></i>
+        <span class="truncate">ဘာသာပြန် မှတ်တမ်းများ</span>
+      </h3>
+
+      <div id="historyListContainer" class="flex-1 overflow-y-auto space-y-3 pr-1 text-xs">
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ================= FOOTER ================= -->
+  <footer class="bg-slate-900/50 border-t border-slate-800/80 py-3 text-center text-[11px] md:text-xs text-slate-500 px-2">
+    SarPay AI Myanmar Translation & Book Studio &copy; 2026. All Rights Reserved.
+  </footer>
+
+
+  <!-- ================= APPLICATION JAVASCRIPT ENGINE ================= -->
+  <script>
+    /* ================= 1. FIREBASE CONFIG & INITIALIZATION ================= */
+    const firebaseConfig = {
+      apiKey: "AIzaSyBFSOzRe4c6Hd57z2VYou-IMfPQ7DiHNpg",
+      authDomain: "sarpay-f4547.firebaseapp.com",
+      databaseURL: "https://sarpay-f4547-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "sarpay-f4547",
+      storageBucket: "sarpay-f4547.firebasestorage.app",
+      messagingSenderId: "405355268245",
+      appId: "1:405355268245:web:a5e406b0fc92b85bd0f39c",
+      measurementId: "G-CNZ69H7TBG"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    /* ================= ADMIN PASSWORD DIRECT CONFIG ================= */
+    const ADMIN_PLAIN_PASSWORD = "iam0";
+
+    /* ================= 2. API ROTATION POOL ================= */
+    const API_ROTATION_POOL = [
+      { provider: 'free_gateway', key: "", model: "public-gtx" },
+      { provider: 'huggingface', key: "", model: "facebook/nllb-200-distilled-600M" },
+      { provider: 'modelscope', key: "", model: "damo/nlp_csanmt_translation_en2zh" }
+    ];
+
+    let currentApiIndex = 0;
+
+    /* ================= MANUAL API KEY / TOKEN STATE ================= */
+    let manualApiKeyData = { provider: 'huggingface', key: '', useDirectly: false };
+
+    function initManualApiKey() {
+      const saved = localStorage.getItem('sarpay_manual_api_key');
+      if (saved) {
+        try { manualApiKeyData = JSON.parse(saved); } catch(e) {}
+      }
+      updateManualKeyUIStatus();
+    }
+
+    function updateManualKeyUIStatus() {
+      const banner = document.getElementById('manualKeyActiveBanner');
+      const providerText = document.getElementById('activeKeyProviderText');
+      if (manualApiKeyData && (manualApiKeyData.key || manualApiKeyData.provider)) {
+        banner.classList.remove('hidden');
+        providerText.innerText = manualApiKeyData.provider;
+      } else {
+        banner.classList.add('hidden');
+      }
+    }
+
+    /* ================= 3. STATE MANAGERS ================= */
+    let currentUser = null;
+    let isAdmin = false;
+    let isAdminPreviewMode = false;
+    let selectedFile = null;
+    let extractedPagesData = [];
+    let pageChunks = [];
+    let selectedChunkIndex = 0;
+    let currentTranslationMode = 'file';
+    let currentTranslationResult = "";
+    let currentAIReviewResult = "";
+    let userCountdownInterval = null;
+
+    /* ================= 4. DEVICE FINGERPRINTING ================= */
+    function getDeviceFingerprint() {
+      let devId = localStorage.getItem('sarpay_device_id');
+      if (!devId) {
+        devId = 'DEV-' + Math.random().toString(36).substring(2, 11) + '-' + Date.now();
+        localStorage.setItem('sarpay_device_id', devId);
+      }
+      return devId;
+    }
+
+    /* ================= 5. TRANSLATION MODE SWITCHING ================= */
+    function switchTranslationMode(mode) {
+      currentTranslationMode = mode;
+      const fileBtn = document.getElementById('modeFileBtn');
+      const textBtn = document.getElementById('modeTextBtn');
+      const fileContainer = document.getElementById('fileUploadContainer');
+      const textContainer = document.getElementById('textInputContainer');
+
+      if (mode === 'file') {
+        fileBtn.className = "flex-1 py-2.5 rounded-lg font-semibold text-white bg-brand-600 shadow transition-all flex items-center justify-center space-x-2";
+        textBtn.className = "flex-1 py-2.5 rounded-lg font-semibold text-slate-400 hover:text-white transition-all flex items-center justify-center space-x-2";
+        fileContainer.classList.remove('hidden');
+        textContainer.classList.add('hidden');
+      } else {
+        textBtn.className = "flex-1 py-2.5 rounded-lg font-semibold text-white bg-brand-600 shadow transition-all flex items-center justify-center space-x-2";
+        fileBtn.className = "flex-1 py-2.5 rounded-lg font-semibold text-slate-400 hover:text-white transition-all flex items-center justify-center space-x-2";
+        textContainer.classList.remove('hidden');
+        fileContainer.classList.add('hidden');
+      }
+    }
+
+    /* ================= 6. AUTHENTICATION LOGIC (REPAIRED) ================= */
+    let currentAuthMode = 'login';
+
+    function switchAuthTab(tab) {
+      currentAuthMode = tab;
+      const usernameGroup = document.getElementById('usernameGroup');
+      const phoneGroup = document.getElementById('phoneGroup');
+      const authPhone = document.getElementById('authPhone');
+      const passwordLabel = document.getElementById('passwordLabel');
+      const submitBtn = document.getElementById('authSubmitBtn');
+      const alertBox = document.getElementById('authAlert');
+      alertBox.classList.add('hidden');
+      alertBox.innerText = '';
+
+      // Reset tab styles
+      document.getElementById('tabLoginBtn').className = "flex-1 py-2 rounded-lg font-semibold text-slate-400 hover:text-white transition-all";
+      document.getElementById('tabRegisterBtn').className = "flex-1 py-2 rounded-lg font-semibold text-slate-400 hover:text-white transition-all";
+      document.getElementById('tabAdminBtn').className = "flex-1 py-2 rounded-lg font-semibold text-slate-400 hover:text-white transition-all";
+
+      if (tab === 'login') {
+        document.getElementById('tabLoginBtn').className = "flex-1 py-2 rounded-lg font-semibold text-white bg-brand-600 shadow transition-all";
+        usernameGroup.classList.add('hidden');
+        phoneGroup.classList.remove('hidden');
+        authPhone.required = true;
+        authPhone.value = '';
+        document.getElementById('authPassword').value = '';
+        passwordLabel.innerText = "စကားဝှက် (Password)";
+        submitBtn.innerText = "ဝင်ရောက်မည်";
+      } else if (tab === 'register') {
+        document.getElementById('tabRegisterBtn').className = "flex-1 py-2 rounded-lg font-semibold text-white bg-brand-600 shadow transition-all";
+        usernameGroup.classList.remove('hidden');
+        phoneGroup.classList.remove('hidden');
+        authPhone.required = true;
+        authPhone.value = '';
+        document.getElementById('authName').value = '';
+        document.getElementById('authPassword').value = '';
+        passwordLabel.innerText = "စကားဝှက် (Password)";
+        submitBtn.innerText = "အကောင့်သစ်ဖွင့်မည်";
+      } else if (tab === 'admin') {
+        document.getElementById('tabAdminBtn').className = "flex-1 py-2 rounded-lg font-semibold text-white bg-indigo-600 shadow transition-all";
+        usernameGroup.classList.add('hidden');
+        phoneGroup.classList.add('hidden');
+        authPhone.required = false;
+        authPhone.value = '';
+        document.getElementById('authPassword').value = '';
+        passwordLabel.innerText = "Admin Password ရိုက်ထည့်ပါ";
+        submitBtn.innerText = "Admin Panel သို့ဝင်မည်";
+      }
+    }
+
+    async function handleAuthSubmit(e) {
+      e.preventDefault();
+      const mode = currentAuthMode;
+      const password = document.getElementById('authPassword').value.trim();
+      
+      // Admin Login
+      if (mode === 'admin') {
+        if (password === ADMIN_PLAIN_PASSWORD) {
+          isAdmin = true;
+          showAdminPanel();
+        } else {
+          showAuthAlert("Admin Password မှားယွင်းနေပါသည်", "error");
+        }
+        return;
+      }
+
+      const phone = document.getElementById('authPhone').value.trim();
+      const name = document.getElementById('authName').value.trim();
+
+      if (!phone || !password) {
+        showAuthAlert("ဖုန်းနံပါတ် နှင့် စကားဝှက် အပြည့်အစုံ ဖြည့်သွင်းပါ", "error");
+        return;
+      }
+
+      const usersRef = db.ref('users');
+      const deviceId = getDeviceFingerprint();
+
+      try {
+        if (mode === 'register') {
+          // Check device limit
+          const allUsersSnap = await usersRef.once('value');
+          let deviceExists = false;
+          if (allUsersSnap.exists()) {
+            allUsersSnap.forEach(child => {
+              if (child.val().deviceId === deviceId) deviceExists = true;
+            });
+          }
+          if (deviceExists) {
+            showAuthAlert("ဤ Device တွင် အကောင့်တစ်ခု ပြုလုပ်ပြီးဖြစ်ပါသည်။ (1 Device Limit)", "error");
+            return;
+          }
+
+          // Check if phone already exists
+          const phoneCheck = await usersRef.child(phone).once('value');
+          if (phoneCheck.exists()) {
+            showAuthAlert("ဤဖုန်းနံပါတ်ဖြင့် အကောင့်ရှိပြီးသားဖြစ်ပါသည်", "error");
+            return;
+          }
+
+          // Create new user
+          const newUser = {
+            phone,
+            name: name || "User",
+            password,
+            coins: 25,
+            remainingTimeSeconds: 15 * 60, // 15 minutes
+            deviceId,
+            createdAt: Date.now()
+          };
+
+          await usersRef.child(phone).set(newUser);
+          showAuthAlert("အကောင့်ဖွင့်ခြင်း အောင်မြင်ပါသည်။ 25 Coins & 15 mins ရရှိပါသည်။", "success");
+          loginUserSession(newUser);
+
+        } else {
+          // Login
+          const snapshot = await usersRef.child(phone).once('value');
+          if (!snapshot.exists()) {
+            showAuthAlert("အကောင့် ရှာမတွေ့ပါ။ ဖုန်းနံပါတ် ပြန်စစ်ပါ", "error");
+            return;
+          }
+          const user = snapshot.val();
+          if (user.password !== password) {
+            showAuthAlert("စကားဝှက် မှားယွင်းနေပါသည်", "error");
+            return;
+          }
+          loginUserSession(user);
+        }
+      } catch (err) {
+        showAuthAlert("ချိတ်ဆက်မှု အမှားအယွင်းရှိပါသည်: " + err.message, "error");
+      }
+    }
+
+    function showAuthAlert(msg, type) {
+      const alert = document.getElementById('authAlert');
+      alert.classList.remove('hidden', 'bg-red-500/20', 'border-red-500', 'text-red-300', 'bg-emerald-500/20', 'border-emerald-500', 'text-emerald-300');
+      if (type === 'error') {
+        alert.classList.add('bg-red-500/20', 'border-red-500', 'text-red-300');
+      } else {
+        alert.classList.add('bg-emerald-500/20', 'border-emerald-500', 'text-emerald-300');
+      }
+      alert.innerText = msg;
+    }
+
+    function loginUserSession(user) {
+      currentUser = user;
+      document.getElementById('authSection').classList.add('hidden');
+      document.getElementById('previewSection').classList.remove('hidden');
+      document.getElementById('navUserProfileBar').classList.remove('hidden');
+      document.getElementById('navUserProfileBar').classList.add('flex');
+
+      db.ref('users/' + user.phone).on('value', (snapshot) => {
+        if (snapshot.exists()) {
+          currentUser = snapshot.val();
+          updateUserUI();
+        }
+      });
+
+      startTimerCountdown();
+      updateManualKeyUIStatus();
+    }
+
+    function updateUserUI() {
+      if (!currentUser) return;
+      document.getElementById('navCoinDisplay').innerText = currentUser.coins || 0;
+      document.getElementById('sidebarCoinCount').innerText = currentUser.coins || 0;
+      document.getElementById('sidebarUserName').innerText = currentUser.name || "User";
+      document.getElementById('sidebarUserPhone').innerText = currentUser.phone;
+
+      const remSecs = currentUser.remainingTimeSeconds || 0;
+      const mins = Math.floor(remSecs / 60);
+      const hrs = Math.floor(mins / 60);
+      const remMins = mins % 60;
+      const formattedTime = `${hrs}h ${remMins}m`;
+
+      document.getElementById('navTimerDisplay').innerText = formattedTime;
+      document.getElementById('sidebarTimerCount').innerText = formattedTime;
+
+      const timeLockBanner = document.getElementById('timeLockBanner');
+      const startTranslateBtn = document.getElementById('startTranslateBtn');
+
+      if (remSecs <= 0 && !isAdminPreviewMode) {
+        timeLockBanner.classList.remove('hidden');
+        startTranslateBtn.disabled = true;
+        startTranslateBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      } else {
+        timeLockBanner.classList.add('hidden');
+        startTranslateBtn.disabled = false;
+        startTranslateBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+      }
+    }
+
+    function startTimerCountdown() {
+      if (userCountdownInterval) clearInterval(userCountdownInterval);
+      userCountdownInterval = setInterval(() => {
+        if (currentUser && currentUser.remainingTimeSeconds > 0) {
+          currentUser.remainingTimeSeconds -= 1;
+          updateUserUI();
+          if (currentUser.remainingTimeSeconds % 30 === 0) {
+            db.ref('users/' + currentUser.phone + '/remainingTimeSeconds').set(currentUser.remainingTimeSeconds);
+          }
+        }
+      }, 1000);
+    }
+
+    function handleUserLogout() {
+      if (userCountdownInterval) clearInterval(userCountdownInterval);
+      currentUser = null;
+      isAdminPreviewMode = false;
+      document.getElementById('adminModeBanner').classList.add('hidden');
+      document.getElementById('navBackToAdminBtn').classList.add('hidden');
+      document.getElementById('previewSection').classList.add('hidden');
+      document.getElementById('navUserProfileBar').classList.add('hidden');
+      document.getElementById('navUserProfileBar').classList.remove('flex');
+      document.getElementById('authSection').classList.remove('hidden');
+      toggleUserSidebar();
+      switchAuthTab('login');
+    }
+
+    /* ================= 7. ADMIN PANEL LOGIC & PREVIEW DASHBOARD ================= */
+    function showAdminPanel() {
+      isAdminPreviewMode = false;
+      document.getElementById('authSection').classList.add('hidden');
+      document.getElementById('previewSection').classList.add('hidden');
+      document.getElementById('adminSection').classList.remove('hidden');
+      document.getElementById('adminModeBanner').classList.add('hidden');
+      document.getElementById('navBackToAdminBtn').classList.add('hidden');
+
+      db.ref('users').on('value', snapshot => {
+        document.getElementById('adminTotalUsersText').innerText = snapshot.numChildren() || 0;
+      });
+
+      db.ref('admin_payment_config').on('value', snapshot => {
+        if (snapshot.exists()) {
+          const cfg = snapshot.val();
+          document.getElementById('adminKpayInput').value = cfg.kpay || '';
+          document.getElementById('adminWaveInput').value = cfg.wave || '';
+          document.getElementById('adminCryptoInput').value = cfg.crypto || '';
+        }
+      });
+
+      db.ref('topup_requests').on('value', snapshot => {
+        const tbody = document.getElementById('adminTopupTableBody');
+        tbody.innerHTML = '';
+        if (!snapshot.exists()) {
+          tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-500">တောင်းဆိုထားသော စာရင်းများ မရှိသေးပါ</td></tr>`;
+          return;
+        }
+
+        snapshot.forEach(child => {
+          const req = child.val();
+          const reqId = child.key;
+          const tr = document.createElement('tr');
+          tr.className = "hover:bg-slate-800/50";
+          tr.innerHTML = `
+            <td class="p-3 font-semibold text-white">${req.userPhone}</td>
+            <td class="p-3 text-amber-400 font-bold">${req.method}</td>
+            <td class="p-3 font-mono">${req.trxId}</td>
+            <td class="p-3 font-bold text-emerald-400">${req.coins} Coins</td>
+            <td class="p-3">
+              <button type="button" onclick="approveTopup('${reqId}', '${req.userPhone}', ${req.coins})" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[10px] font-bold">
+                Approve Coin
+              </button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      });
+    }
+
+    function adminGoToPreviewDashboard() {
+      isAdminPreviewMode = true;
+      document.getElementById('adminSection').classList.add('hidden');
+      document.getElementById('previewSection').classList.remove('hidden');
+      document.getElementById('navUserProfileBar').classList.remove('hidden');
+      document.getElementById('navUserProfileBar').classList.add('flex');
+      document.getElementById('adminModeBanner').classList.remove('hidden');
+      document.getElementById('navBackToAdminBtn').classList.remove('hidden');
+    }
+
+    function returnToAdminPanel() {
+      if (isAdmin) showAdminPanel();
+    }
+
+    async function saveAdminPaymentConfig() {
+      const kpay = document.getElementById('adminKpayInput').value.trim();
+      const wave = document.getElementById('adminWaveInput').value.trim();
+      const crypto = document.getElementById('adminCryptoInput').value.trim();
+      await db.ref('admin_payment_config').set({ kpay, wave, crypto });
+      alert("Payment Info များကို Firebase တွင် သိမ်းဆည်းပြီးပါပြီ!");
+    }
+
+    async function approveTopup(reqId, userPhone, coins) {
+      const userRef = db.ref('users/' + userPhone);
+      const snapshot = await userRef.once('value');
+      if (snapshot.exists()) {
+        const currentCoins = snapshot.val().coins || 0;
+        await userRef.update({ coins: currentCoins + parseInt(coins) });
+        await db.ref('topup_requests/' + reqId).remove();
+        alert(`${userPhone} သို့ ${coins} Coins ဖြည့်သွင်းပေးလိုက်ပါပြီ!`);
+      }
+    }
+
+    function adminLogout() {
+      isAdmin = false;
+      isAdminPreviewMode = false;
+      document.getElementById('authPassword').value = '';
+      document.getElementById('adminSection').classList.add('hidden');
+      document.getElementById('adminModeBanner').classList.add('hidden');
+      document.getElementById('navBackToAdminBtn').classList.add('hidden');
+      document.getElementById('authSection').classList.remove('hidden');
+      db.ref('users').off();
+      db.ref('admin_payment_config').off();
+      db.ref('topup_requests').off();
+      switchAuthTab('login');
+    }
+
+    /* ================= 8. COIN ECONOMY & MODALS ================= */
+    function toggleUserSidebar() {
+      const sidebar = document.getElementById('userSidebar');
+      const overlay = document.getElementById('userSidebarOverlay');
+      sidebar.classList.toggle('translate-x-full');
+      overlay.classList.toggle('hidden');
+    }
+
+    function openApiKeyModal() {
+      if (manualApiKeyData && (manualApiKeyData.key || manualApiKeyData.provider)) {
+        document.getElementById('manualApiKeyInput').value = manualApiKeyData.key || '';
+        document.getElementById('manualProviderSelect').value = manualApiKeyData.provider || 'huggingface';
+        document.getElementById('useManualKeyOnlyCheck').checked = !!manualApiKeyData.useDirectly;
+      }
+      document.getElementById('apiKeyTestStatusText').classList.add('hidden');
+      document.getElementById('apiKeyModal').classList.remove('hidden');
+    }
+
+    async function testManualApiKeyConnection() {
+      const provider = document.getElementById('manualProviderSelect').value;
+      const key = document.getElementById('manualApiKeyInput').value.trim();
+      const statusBox = document.getElementById('apiKeyTestStatusText');
+
+      statusBox.classList.remove('hidden', 'bg-red-500/20', 'text-red-300', 'bg-emerald-500/20', 'text-emerald-300', 'bg-amber-500/20', 'text-amber-300');
+      statusBox.classList.add('bg-amber-500/20', 'text-amber-300');
+      statusBox.innerText = "API / Token ချိတ်ဆက်မှုကို စမ်းသပ်နေပါသည်...";
+
+      try {
+        const testResult = await executeSingleApiCall(provider, key, null, "Hello, Myanmar language translation test.");
+        if (testResult && testResult.length > 0) {
+          statusBox.classList.remove('bg-amber-500/20', 'text-amber-300');
+          statusBox.classList.add('bg-emerald-500/20', 'text-emerald-300');
+          statusBox.innerText = "Connection Successful! ဘာသာပြန်စနစ် ပုံမှန်အလုပ်လုပ်ပါသည်။";
+        } else {
+          throw new Error("Empty response");
+        }
+      } catch (err) {
+        statusBox.classList.remove('bg-amber-500/20', 'text-amber-300');
+        statusBox.classList.add('bg-red-500/20', 'text-red-300');
+        statusBox.innerText = "Connection Failed: Token သို့မဟုတ် Provider အဆင်မပြေပါ (" + err.message + ")";
+      }
+    }
+
+    function handleManualApiKeySave(e) {
+      e.preventDefault();
+      const provider = document.getElementById('manualProviderSelect').value;
+      const key = document.getElementById('manualApiKeyInput').value.trim();
+      const useDirectly = document.getElementById('useManualKeyOnlyCheck').checked;
+
+      manualApiKeyData = { provider, key, useDirectly };
+      localStorage.setItem('sarpay_manual_api_key', JSON.stringify(manualApiKeyData));
+      updateManualKeyUIStatus();
+      closeModal('apiKeyModal');
+      alert("Custom API / Token Config သိမ်းဆည်းပြီးပါပြီ!");
+    }
+
+    function clearManualApiKey() {
+      manualApiKeyData = { provider: 'huggingface', key: '', useDirectly: false };
+      localStorage.removeItem('sarpay_manual_api_key');
+      document.getElementById('manualApiKeyInput').value = '';
+      document.getElementById('useManualKeyOnlyCheck').checked = false;
+      document.getElementById('apiKeyTestStatusText').classList.add('hidden');
+      updateManualKeyUIStatus();
+      closeModal('apiKeyModal');
+      alert("Custom API Key / Token ကို ဖျက်လိုက်ပါပြီ!");
+    }
+
+    function selectPaymentMethod(method) {
+      document.getElementById('topupMethodSelect').value = method;
+      const btns = document.querySelectorAll('.pay-method-btn');
+      btns.forEach(btn => {
+        btn.classList.remove('border-brand-500', 'bg-brand-900/20', 'text-white');
+        btn.classList.add('border-slate-700', 'bg-slate-900/90', 'text-slate-300');
+      });
+      if (method === 'KPay') {
+        document.getElementById('payBtnKPay').classList.add('border-brand-500', 'bg-brand-900/20', 'text-white');
+        document.getElementById('payBtnKPay').classList.remove('border-slate-700', 'bg-slate-900/90');
+      } else if (method === 'WavePay') {
+        document.getElementById('payBtnWavePay').classList.add('border-brand-500', 'bg-brand-900/20', 'text-white');
+        document.getElementById('payBtnWavePay').classList.remove('border-slate-700', 'bg-slate-900/90');
+      } else if (method === 'USDT BEP-20') {
+        document.getElementById('payBtnUSDT').classList.add('border-brand-500', 'bg-brand-900/20', 'text-white');
+        document.getElementById('payBtnUSDT').classList.remove('border-slate-700', 'bg-slate-900/90');
+      }
+    }
+
+    function setCoinAmountPreset(amt) {
+      document.getElementById('topupCoinAmount').value = amt;
+    }
+
+    function openCoinBuyModal() {
+      db.ref('admin_payment_config').once('value', snapshot => {
+        if (snapshot.exists()) {
+          const cfg = snapshot.val();
+          document.getElementById('kpayDisplay').innerHTML = `KPay: <span class="text-amber-300 font-mono">${cfg.kpay || 'မသတ်မှတ်ရသေးပါ'}</span>`;
+          document.getElementById('waveDisplay').innerHTML = `WavePay: <span class="text-amber-300 font-mono">${cfg.wave || 'မသတ်မှတ်ရသေးပါ'}</span>`;
+          document.getElementById('cryptoDisplay').innerHTML = `USDT (BEP-20): <span class="text-amber-300 font-mono">${cfg.crypto || 'မသတ်မှတ်ရသေးပါ'}</span>`;
+        }
+      });
+      document.getElementById('coinBuyModal').classList.remove('hidden');
+    }
+
+    async function handleTopupSubmit(e) {
+      e.preventDefault();
+      const method = document.getElementById('topupMethodSelect').value;
+      const coins = parseInt(document.getElementById('topupCoinAmount').value);
+      const trxId = document.getElementById('topupTrxInput').value.trim();
+
+      if (isNaN(coins) || coins <= 0) {
+        alert("ကျေးဇူးပြု၍ မှန်ကန်သော Coin ပမာဏ ရိုက်ထည့်ပါ");
+        return;
+      }
+
+      await db.ref('topup_requests').push({
+        userPhone: currentUser.phone,
+        method,
+        coins,
+        trxId,
+        timestamp: Date.now()
+      });
+
+      alert("Coin ဝယ်ယူခွင့် တောင်းဆိုမှု အောင်မြင်ပါသည်။ Admin မှ စစ်ဆေးပြီး Coin ထည့်ပေးပါမည်။");
+      closeModal('coinBuyModal');
+    }
+
+    function openCoinExchangeModal() {
+      document.getElementById('coinExchangeModal').classList.remove('hidden');
+    }
+
+    async function executeCoinToTimeExchange() {
+      const coinAmt = parseInt(document.getElementById('exchangeCoinInput').value);
+      if (isNaN(coinAmt) || coinAmt < 10) {
+        alert("အနည်းဆုံး 10 Coins လဲလှယ်ရပါမည်");
+        return;
+      }
+      if (currentUser.coins < coinAmt) {
+        alert("သင့်ထံတွင် Coin လုံလောက်မှု မရှိပါ");
+        return;
+      }
+
+      const addedSeconds = (coinAmt / 10) * 3600;
+      const newCoins = currentUser.coins - coinAmt;
+      const newTime = (currentUser.remainingTimeSeconds || 0) + addedSeconds;
+
+      await db.ref('users/' + currentUser.phone).update({
+        coins: newCoins,
+        remainingTimeSeconds: newTime
+      });
+
+      alert(`Coin ${coinAmt} ဖြင့် အသုံးပြုချိန် ${(coinAmt/10)} နာရီ လဲလှယ်မှု အောင်မြင်ပါသည်!`);
+      closeModal('coinExchangeModal');
+    }
+
+    function openCoinTransferModal() {
+      document.getElementById('coinTransferModal').classList.remove('hidden');
+    }
+
+    async function executeCoinTransfer() {
+      const targetPhone = document.getElementById('transferTargetPhone').value.trim();
+      const amount = parseInt(document.getElementById('transferAmountInput').value);
+
+      if (targetPhone === currentUser.phone) {
+        alert("မိမိအကောင့်သို့ ပြန်လွှဲ၍မရပါ");
+        return;
+      }
+      if (currentUser.coins < amount) {
+        alert("Coin ပမာဏ မလုံလောက်ပါ");
+        return;
+      }
+
+      const targetRef = db.ref('users/' + targetPhone);
+      const snapshot = await targetRef.once('value');
+
+      if (!snapshot.exists()) {
+        alert("လက်ခံမည့် User ဖုန်းနံပါတ် ရှာမတွေ့ပါ");
+        return;
+      }
+
+      const targetCoins = snapshot.val().coins || 0;
+      await targetRef.update({ coins: targetCoins + amount });
+      await db.ref('users/' + currentUser.phone).update({ coins: currentUser.coins - amount });
+
+      alert(`${targetPhone} သို့ Coin ${amount} လွှဲပြောင်းမှု အောင်မြင်ပါသည်!`);
+      closeModal('coinTransferModal');
+    }
+
+    function closeModal(modalId) {
+      document.getElementById(modalId).classList.add('hidden');
+    }
+
+    /* ================= 9. DOCUMENT & CHUNK SPLITTING LOGIC ================= */
+    async function handleFileSelected(e) {
+      selectedFile = e.target.files[0];
+      if (!selectedFile) return;
+
+      document.getElementById('fileNameText').innerText = selectedFile.name;
+      document.getElementById('fileInfoDisplay').classList.remove('hidden');
+
+      extractedPagesData = await parseFileIntoPageData(selectedFile);
+      const totalPages = extractedPagesData.length;
+      document.getElementById('filePageText').innerText = `(${totalPages} pages)`;
+
+      const chunkWrapper = document.getElementById('pageChunkSelectionWrapper');
+      const chunkOptionsContainer = document.getElementById('chunkOptionsContainer');
+      const totalChunkInfoText = document.getElementById('totalChunkInfoText');
+
+      pageChunks = [];
+      chunkOptionsContainer.innerHTML = '';
+
+      if (totalPages > 5) {
+        chunkWrapper.classList.remove('hidden');
+        const chunkSize = 5;
+        let chunkIndex = 0;
+
+        for (let i = 0; i < totalPages; i += chunkSize) {
+          const startPage = i + 1;
+          const endPage = Math.min(i + chunkSize, totalPages);
+          
+          let chunkText = "";
+          for (let p = i; p < endPage; p++) {
+            chunkText += extractedPagesData[p].text + "\n\n";
+          }
+
+          pageChunks.push({
+            index: chunkIndex,
+            title: `Page ${startPage} - ${endPage}`,
+            startPage,
+            endPage,
+            text: chunkText
+          });
+
+          const label = document.createElement('label');
+          label.className = `flex items-center space-x-2.5 p-3 rounded-xl bg-slate-900 border ${chunkIndex === 0 ? 'border-brand-500 bg-brand-900/20' : 'border-slate-700'} hover:border-brand-500 cursor-pointer transition-all chunk-option-label`;
+          label.innerHTML = `
+            <input type="radio" name="selectedPageChunk" value="${chunkIndex}" ${chunkIndex === 0 ? 'checked' : ''} onchange="onChunkSelected(${chunkIndex})" class="text-brand-600 focus:ring-brand-500">
+            <div>
+              <span class="font-bold text-white block">အပိုင်း (${chunkIndex + 1}): Page ${startPage} - ${endPage}</span>
+              <span class="text-[10px] text-slate-400">စာမျက်နှာ ${startPage} မှ ${endPage} ထိ အပိုင်း</span>
+            </div>
+          `;
+          chunkOptionsContainer.appendChild(label);
+          chunkIndex++;
+        }
+
+        selectedChunkIndex = 0;
+        totalChunkInfoText.innerText = `စုစုပေါင်း အပိုင်း ${pageChunks.length} ပိုင်း ခွဲခြားထားပါသည်`;
+      } else {
+        chunkWrapper.classList.add('hidden');
+        selectedChunkIndex = 0;
+        let fullText = extractedPagesData.map(p => p.text).join("\n\n");
+        pageChunks = [{ index: 0, title: `Full Document (1-${totalPages})`, startPage: 1, endPage: totalPages, text: fullText }];
+      }
+    }
+
+    function onChunkSelected(index) {
+      selectedChunkIndex = index;
+      const labels = document.querySelectorAll('.chunk-option-label');
+      labels.forEach((lbl, idx) => {
+        if (idx === index) {
+          lbl.classList.add('border-brand-500', 'bg-brand-900/20');
+          lbl.classList.remove('border-slate-700');
+        } else {
+          lbl.classList.remove('border-brand-500', 'bg-brand-900/20');
+          lbl.classList.add('border-slate-700');
+        }
+      });
+    }
+
+    async function parseFileIntoPageData(file) {
+      const pageList = [];
+      if (file.type === "application/pdf") {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          const strings = content.items.map(item => item.str);
+          pageList.push({ pageNum: i, text: strings.join(" ") });
+        }
+      } else if (file.name.endsWith(".docx")) {
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+        const text = result.value;
+        const estPages = Math.ceil(text.length / 2000) || 1;
+        const charsPerPage = Math.ceil(text.length / estPages);
+        for (let i = 0; i < estPages; i++) {
+          pageList.push({ pageNum: i + 1, text: text.substring(i * charsPerPage, (i + 1) * charsPerPage) });
+        }
+      } else {
+        const text = await file.text();
+        const estPages = Math.ceil(text.length / 2000) || 1;
+        const charsPerPage = Math.ceil(text.length / estPages);
+        for (let i = 0; i < estPages; i++) {
+          pageList.push({ pageNum: i + 1, text: text.substring(i * charsPerPage, (i + 1) * charsPerPage) });
+        }
+      }
+      return pageList;
+    }
+
+    /* ================= 10. API TRANSLATION PIPELINE ================= */
+    async function executeSingleApiCall(provider, key, model, prompt) {
+      let responseText = "";
+      const cleanText = prompt.replace(/^(Translate|Generate).*?:\n\n/is, '');
+
+      if (provider === 'free_gateway') {
+        const targetUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=my&dt=t&q=${encodeURIComponent(cleanText)}`;
+        const res = await fetch(targetUrl);
+        if (!res.ok) throw new Error(`Free Public Gateway Status ${res.status}`);
+        const data = await res.json();
+        if (data && data[0]) {
+          responseText = data[0].map(x => x[0]).join('');
+        } else {
+          throw new Error("Invalid response from Free Gateway");
+        }
+      }
+      else if (provider === 'huggingface') {
+        const targetModel = model || "facebook/nllb-200-distilled-600M";
+        const hfEndpoint = `https://api-inference.huggingface.co/models/${targetModel}`;
+        const headers = { "Content-Type": "application/json" };
+        if (key && key.trim().length > 0) headers["Authorization"] = `Bearer ${key.trim()}`;
+        
+        try {
+          const res = await fetch(hfEndpoint, {
+            method: "POST",
+            headers: headers,
+            body: JSON.stringify({
+              inputs: cleanText,
+              parameters: { src_lang: "eng_Latn", tgt_lang: "mym_Mymr" }
+            })
+          });
+          if (!res.ok) throw new Error(`HuggingFace API Status ${res.status}`);
+          const data = await res.json();
+          if (Array.isArray(data) && data[0] && data[0].translation_text) {
+            responseText = data[0].translation_text;
+          } else if (data.generated_text) {
+            responseText = data.generated_text;
+          } else {
+            throw new Error("Hugging Face processing fallback required");
+          }
+        } catch(err) {
+          return await executeSingleApiCall('free_gateway', '', '', prompt);
+        }
+      }
+      else if (provider === 'modelscope') {
+        const targetModel = model || "damo/nlp_csanmt_translation_en2zh";
+        const msEndpoint = `https://api-inference.modelscope.cn/v1/models/${targetModel}`;
+        const headers = { "Content-Type": "application/json" };
+        if (key && key.trim().length > 0) headers["Authorization"] = `Bearer ${key.trim()}`;
+        try {
+          const res = await fetch(msEndpoint, {
+            method: "POST",
+            headers: headers,
+            body: JSON.stringify({ input: cleanText, parameters: {} })
+          });
+          if (!res.ok) throw new Error(`ModelScope API status ${res.status}`);
+          const data = await res.json();
+          if (data && data.output && data.output.translation) {
+            responseText = data.output.translation;
+          } else if (data && data.Output) {
+            responseText = typeof data.Output === 'string' ? data.Output : JSON.stringify(data.Output);
+          } else {
+            throw new Error("ModelScope processing fallback required");
+          }
+        } catch(err) {
+          return await executeSingleApiCall('free_gateway', '', '', prompt);
+        }
+      }
+      return responseText;
+    }
+
+    async function callRotatedAI(prompt) {
+      if (manualApiKeyData && manualApiKeyData.useDirectly && manualApiKeyData.key) {
+        try {
+          return await executeSingleApiCall(manualApiKeyData.provider, manualApiKeyData.key, null, prompt);
+        } catch(manualErr) {
+          console.warn("Direct Custom API call failed, falling back to rotation pool:", manualErr.message);
+        }
+      }
+
+      const maxAttempts = API_ROTATION_POOL.length * 2;
+      let attempts = 0;
+
+      while (attempts < maxAttempts) {
+        const config = API_ROTATION_POOL[currentApiIndex];
+        try {
+          const resText = await executeSingleApiCall(config.provider, config.key, config.model, prompt);
+          if (resText && resText.trim().length > 0) return resText;
+          throw new Error("Empty response from AI");
+        } catch (err) {
+          console.warn(`⚠️ API Index ${currentApiIndex} (${config.provider}) failed:`, err.message);
+          currentApiIndex = (currentApiIndex + 1) % API_ROTATION_POOL.length;
+          attempts++;
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
+      }
+
+      return await executeSingleApiCall('free_gateway', '', '', prompt);
+    }
+
+    function splitTextIntoSubChunks(text, maxChars = 2500) {
+      if (!text || text.length <= maxChars) return [text];
+      const paragraphs = text.split(/(\n+)/);
+      const chunks = [];
+      let currentChunk = "";
+
+      for (let p of paragraphs) {
+        if ((currentChunk + p).length > maxChars) {
+          if (currentChunk.trim().length > 0) {
+            chunks.push(currentChunk.trim());
+            currentChunk = "";
+          }
+          if (p.length > maxChars) {
+            const sentences = p.split(/(?<=\.\s+)/);
+            for (let s of sentences) {
+              if ((currentChunk + s).length > maxChars) {
+                if (currentChunk.trim().length > 0) chunks.push(currentChunk.trim());
+                currentChunk = s;
+              } else {
+                currentChunk += s;
+              }
+            }
+          } else {
+            currentChunk = p;
+          }
+        } else {
+          currentChunk += p;
+        }
+      }
+      if (currentChunk.trim().length > 0) chunks.push(currentChunk.trim());
+      return chunks;
+    }
+
+    /* ================= 11. MAIN WORKFLOW EXECUTION ================= */
+    async function executeTranslationWorkflow() {
+      if (currentUser && (currentUser.remainingTimeSeconds || 0) <= 0 && !isAdminPreviewMode) {
+        alert("အသုံးပြုချိန် သက်တမ်း ကုန်ဆုံးသွားပါပြီ (Time Expired). ဘာသာပြန်စနစ် အလုပ်မလုပ်တော့ပါ။ ကျေးဇူးပြု၍ Coin ဖြင့် Time ထပ်ဝယ်ပါ။");
+        return;
+      }
+
+      let sourceText = "";
+
+      if (currentTranslationMode === 'file') {
+        if (!selectedFile) {
+          alert("ကျေးဇူးပြု၍ ဘာသာပြန်မည့် ဖိုင်ကို အစပိုင်းတွင် တင်ပေးပါ (သို့မဟုတ် Text Mode သို့ ပြောင်းပါ)");
+          return;
+        }
+        if (!pageChunks || pageChunks.length === 0) {
+          alert("ဖိုင်အချက်အလက်များ ဖတ်ရှုနေဆဲဖြစ်ပါသည်။ စက္ကန့်အနည်းငယ်စောင့်ပါ");
+          return;
+        }
+
+        const activeChunk = pageChunks[selectedChunkIndex] || pageChunks[0];
+        sourceText = activeChunk.text;
+
+        AudioEngine.playNotice();
+        const progressCard = document.getElementById('translationProgressCard');
+        const progressBar = document.getElementById('progressBarFill');
+        const progressText = document.getElementById('progressStatusText');
+        const estText = document.getElementById('estimatedTimeText');
+        const elapText = document.getElementById('elapsedTimeText');
+
+        progressCard.classList.remove('hidden');
+        document.getElementById('translationResultWrapper').classList.add('hidden');
+
+        const startTime = Date.now();
+        const timerInterval = setInterval(() => {
+          const elapsedSecs = Math.floor((Date.now() - startTime) / 1000);
+          const m = Math.floor(elapsedSecs / 60).toString().padStart(2, '0');
+          const s = (elapsedSecs % 60).toString().padStart(2, '0');
+          elapText.innerText = `${m}:${s}`;
+        }, 1000);
+
+        try {
+          const subChunks = splitTextIntoSubChunks(sourceText, 2500);
+          const totalSubChunks = subChunks.length;
+          let aggregatedTranslation = [];
+
+          const wordCount = sourceText.split(/\s+/).length;
+          const estSecs = Math.max(10, Math.ceil(wordCount / 30));
+          const estM = Math.floor(estSecs / 60).toString().padStart(2, '0');
+          const estS = (estSecs % 60).toString().padStart(2, '0');
+          estText.innerText = `${estM}:${estS}`;
+
+          const selectedStyle = document.querySelector('input[name="translationStyle"]:checked').value;
+          let styleInstruction = "Translate into clear, natural Burmese.";
+          if (selectedStyle === 'offcial') styleInstruction = "Translate into formal Official Burmese style (ရုံးသုံးစတိုင် - တရားဝင်၊ တိကျသေသပ်သော ဝေါဟာရများသုံး၍).";
+          else if (selectedStyle === 'prose') styleInstruction = "Translate into smooth, easy-to-read Prose Burmese style (စကားပြေစတိုင် - ဖတ်ရှုရလွယ်ကူပြီး သဘာဝကျသော).";
+          else if (selectedStyle === 'literary') styleInstruction = "Translate into expressive Literary Burmese style (စာပေစတိုင် - အနုပညာမြောက် စာပေဆန်ဆန်).";
+
+          for (let i = 0; i < totalSubChunks; i++) {
+            const subChunkText = subChunks[i];
+            const pct = Math.floor(((i + 1) / totalSubChunks) * 80);
+            progressBar.style.width = `${pct}%`;
+            progressText.innerText = `${activeChunk.title} (အပိုင်းငယ် ${i + 1}/${totalSubChunks}) ကို ဘာသာပြန်ဆိုနေသည်...`;
+
+            const prompt = `${styleInstruction} Output ONLY the translation:\n\n${subChunkText}`;
+            const subTranslated = await callRotatedAI(prompt);
+            aggregatedTranslation.push(subTranslated);
+
+            if (i < totalSubChunks - 1) await new Promise(res => setTimeout(res, 300));
+          }
+
+          currentTranslationResult = aggregatedTranslation.join("\n\n");
+
+          document.getElementById('singleTranslationCard').classList.remove('hidden');
+          document.getElementById('segmentCardsContainer').classList.add('hidden');
+          document.getElementById('translatedOutputContent').innerText = currentTranslationResult;
+
+          progressText.innerText = "AI သုံးသပ်ချက် နှင့် Review File ဖန်တီးနေသည်...";
+          progressBar.style.width = "90%";
+
+          const reviewPrompt = `Generate a 5-Section Executive Review & Summary in Burmese for this content (${activeChunk.title}):
+1. Executive Summary (အနှစ်ချုပ်)
+2. Core Concepts (အဓိက အချက်များ)
+3. Strengths (အားသာချက်များ)
+4. Weaknesses & Critical Analysis (အားနည်းချက်များ နှင့် ဝိဖန်ချက်)
+5. AI Perspective & Insights (AI ၏ အမြင်နှင့် အတွေးများ)
+
+Content Snippet:\n\n${sourceText.substring(0, 3500)}`;
+
+          currentAIReviewResult = await callRotatedAI(reviewPrompt);
+          progressBar.style.width = "100%";
+
+          if (currentUser) {
+            await db.ref(`users/${currentUser.phone}/history`).push({
+              fileName: `${selectedFile.name} (${activeChunk.title})`,
+              isLargeBook: false,
+              translation: currentTranslationResult,
+              segments: [],
+              aiReview: currentAIReviewResult,
+              timestamp: Date.now()
+            });
+          }
+
+          clearInterval(timerInterval);
+          progressCard.classList.add('hidden');
+          document.getElementById('translationResultWrapper').classList.remove('hidden');
+          AudioEngine.playSuccess();
+
+        } catch (err) {
+          clearInterval(timerInterval);
+          alert("ဘာသာပြန်ရာတွင် အမှားအယွင်း ဖြစ်ပေါ်ခဲ့ပါသည်:\n\n" + err.message);
+          progressCard.classList.add('hidden');
+        }
+
+      } else {
+        sourceText = document.getElementById('directTextInputArea').value.trim();
+        if (!sourceText) {
+          alert("ကျေးဇူးပြု၍ ဘာသာပြန်လိုသော စာသားကို ရိုက်ထည့်ပါ သို့မဟုတ် Copy ကူးထည့်ပါ");
+          return;
+        }
+
+        AudioEngine.playNotice();
+        const progressCard = document.getElementById('translationProgressCard');
+        const progressBar = document.getElementById('progressBarFill');
+        const progressText = document.getElementById('progressStatusText');
+        const estText = document.getElementById('estimatedTimeText');
+        const elapText = document.getElementById('elapsedTimeText');
+
+        progressCard.classList.remove('hidden');
+        document.getElementById('translationResultWrapper').classList.add('hidden');
+
+        const startTime = Date.now();
+        const timerInterval = setInterval(() => {
+          const elapsedSecs = Math.floor((Date.now() - startTime) / 1000);
+          const m = Math.floor(elapsedSecs / 60).toString().padStart(2, '0');
+          const s = (elapsedSecs % 60).toString().padStart(2, '0');
+          elapText.innerText = `${m}:${s}`;
+        }, 1000);
+
+        try {
+          const subChunks = splitTextIntoSubChunks(sourceText, 2500);
+          const totalSubChunks = subChunks.length;
+          let aggregatedTranslation = [];
+
+          estText.innerText = "00:15";
+
+          const selectedStyle = document.querySelector('input[name="translationStyle"]:checked').value;
+          let styleInstruction = "Translate into clear, natural Burmese.";
+          if (selectedStyle === 'offcial') styleInstruction = "Translate into formal Official Burmese style (ရုံးသုံးစတိုင် - တရားဝင်၊ တိကျသေသပ်သော ဝေါဟာရများသုံး၍).";
+          else if (selectedStyle === 'prose') styleInstruction = "Translate into smooth, easy-to-read Prose Burmese style (စကားပြေစတိုင် - ဖတ်ရှုရလွယ်ကူပြီး သဘာဝကျသော).";
+          else if (selectedStyle === 'literary') styleInstruction = "Translate into expressive Literary Burmese style (စာပေစတိုင် - အနုပညာမြောက် စာပေဆန်ဆန်).";
+
+          for (let i = 0; i < totalSubChunks; i++) {
+            const subChunkText = subChunks[i];
+            const pct = Math.floor(((i + 1) / totalSubChunks) * 90);
+            progressBar.style.width = `${pct}%`;
+            progressText.innerText = `ကူးထည့်ထားသော စာသားများ (အပိုင်း ${i + 1}/${totalSubChunks}) ကို ဘာသာပြန်ဆိုနေသည်...`;
+
+            const prompt = `${styleInstruction} Output ONLY the translation:\n\n${subChunkText}`;
+            const subTranslated = await callRotatedAI(prompt);
+            aggregatedTranslation.push(subTranslated);
+
+            if (i < totalSubChunks - 1) await new Promise(res => setTimeout(res, 300));
+          }
+
+          currentTranslationResult = aggregatedTranslation.join("\n\n");
+
+          progressBar.style.width = "100%";
+          document.getElementById('singleTranslationCard').classList.remove('hidden');
+          document.getElementById('segmentCardsContainer').classList.add('hidden');
+          document.getElementById('translatedOutputContent').innerText = currentTranslationResult;
+
+          if (currentUser) {
+            await db.ref(`users/${currentUser.phone}/history`).push({
+              fileName: "Direct Text Translation",
+              isLargeBook: false,
+              translation: currentTranslationResult,
+              segments: [],
+              aiReview: "Direct Text Translation Summary",
+              timestamp: Date.now()
+            });
+          }
+
+          clearInterval(timerInterval);
+          progressCard.classList.add('hidden');
+          document.getElementById('translationResultWrapper').classList.remove('hidden');
+          AudioEngine.playSuccess();
+
+        } catch (err) {
+          clearInterval(timerInterval);
+          alert("ဘာသာပြန်ရာတွင် အမှားအယွင်း ဖြစ်ပေါ်ခဲ့ပါသည်:\n\n" + err.message);
+          progressCard.classList.add('hidden');
+        }
+      }
+    }
+
+    /* ================= 12. EXPORTS & HISTORY ================= */
+    function copyFullTranslation() {
+      navigator.clipboard.writeText(currentTranslationResult);
+      alert("ဘာသာပြန် ရလဒ်အားလုံးကို Copy ကူးယူပြီးပါပြီ!");
+    }
+
+    function downloadAsFormat(format) {
+      if (!currentTranslationResult) return;
+      const baseName = (selectedFile && selectedFile.name) ? selectedFile.name.split('.')[0] : "Translated_Text";
+
+      if (format === 'txt') {
+        const blob = new Blob([currentTranslationResult], { type: "text/plain;charset=utf-8" });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `${baseName}_Myanmar.txt`;
+        a.click();
+      } else if (format === 'pdf') {
+        const element = document.createElement('div');
+        element.style.padding = '20px';
+        element.style.color = '#000';
+        element.style.fontFamily = 'Padauk, sans-serif';
+        element.innerText = currentTranslationResult;
+        html2pdf().from(element).save(`${baseName}_Myanmar.pdf`);
+      } else if (format === 'docx') {
+        const doc = new docx.Document({
+          sections: [{
+            children: currentTranslationResult.split('\n').map(line => new docx.Paragraph({
+              children: [new docx.TextRun(line)]
+            }))
+          }]
+        });
+        docx.Packer.toBlob(doc).then(blob => {
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = `${baseName}_Myanmar.docx`;
+          a.click();
+        });
+      }
+    }
+
+    function downloadAIReviewFile() {
+      if (!currentAIReviewResult) return;
+      const baseName = (selectedFile && selectedFile.name) ? selectedFile.name.split('.')[0] : "Document";
+      const blob = new Blob([currentAIReviewResult], { type: "text/plain;charset=utf-8" });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${baseName}_AI_Executive_Review.txt`;
+      a.click();
+    }
+
+    async function showHistoryModal(type) {
+      const isLargeTarget = (type === 'large');
+      document.getElementById('historyModalTitle').innerHTML = `<i class="fa-solid fa-history text-indigo-400 mr-2"></i><span>${isLargeTarget ? "စာအုပ်အကြီးများ မှတ်တမ်း" : "စာအုပ်အသေးများ မှတ်တမ်း"}</span>`;
+      const container = document.getElementById('historyListContainer');
+      container.innerHTML = '<p class="text-slate-500 text-center py-4">Loading history...</p>';
+
+      if (!currentUser) {
+        container.innerHTML = '<p class="text-slate-500 text-center py-4">ကျေးဇူးပြု၍ အကောင့်ဝင်ပါ</p>';
+        document.getElementById('historyModal').classList.remove('hidden');
+        return;
+      }
+
+      const snapshot = await db.ref(`users/${currentUser.phone}/history`).once('value');
+      container.innerHTML = '';
+
+      if (!snapshot.exists()) {
+        container.innerHTML = '<p class="text-slate-500 text-center py-4">မှတ်တမ်းများ မရှိသေးပါ</p>';
+        document.getElementById('historyModal').classList.remove('hidden');
+        return;
+      }
+
+      snapshot.forEach(child => {
+        const item = child.val();
+        const itemKey = child.key;
+
+        const div = document.createElement('div');
+        div.className = "bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2";
+        div.innerHTML = `
+          <div class="flex items-center justify-between gap-2">
+            <span class="font-bold text-white truncate">${item.fileName}</span>
+            <div class="space-x-1 shrink-0">
+              <button type="button" onclick="restoreHistoryItem('${itemKey}')" class="px-2 py-1 bg-brand-600 hover:bg-brand-500 text-white font-bold rounded text-[10px]">
+                ကြည့်မည်
+              </button>
+            </div>
+          </div>
+          <p class="text-[10px] text-slate-500">${new Date(item.timestamp).toLocaleString()}</p>
+        `;
+        container.appendChild(div);
+      });
+
+      document.getElementById('historyModal').classList.remove('hidden');
+    }
+
+    async function restoreHistoryItem(key) {
+      if (!currentUser) return;
+      const snapshot = await db.ref(`users/${currentUser.phone}/history/${key}`).once('value');
+      if (snapshot.exists()) {
+        const item = snapshot.val();
+        currentTranslationResult = item.translation || "";
+        currentAIReviewResult = item.aiReview || "";
+        document.getElementById('singleTranslationCard').classList.remove('hidden');
+        document.getElementById('translatedOutputContent').innerText = currentTranslationResult;
+        document.getElementById('translationResultWrapper').classList.remove('hidden');
+        closeModal('historyModal');
+        toggleUserSidebar();
+      }
+    }
+
+    /* ================= INIT ================= */
+    window.addEventListener('DOMContentLoaded', () => {
+      initManualApiKey();
+      switchAuthTab('login'); // Set default login tab
+    });
+  </script>
+</body>
+</html>
